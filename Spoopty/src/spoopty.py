@@ -65,6 +65,27 @@ def log_machine_info():
     logging.info(get_machine_info())
     logging.info("------------------------")
 
+def get_system_info():
+    system_info = []
+    system_info.append(f"Operating System: {platform.system()} {platform.release()}")
+    system_info.append(f"Operating System Version: {platform.version()}")
+    system_info.append(f"Processor: {platform.processor()}")
+    system_info.append(f"Machine: {platform.machine()}")
+    system_info.append(f"Python Version: {platform.python_version()}")
+
+    if psutil:
+        system_info.append(f"CPU Cores: {psutil.cpu_count()}")
+        system_info.append(f"CPU Frequency: {psutil.cpu_freq().current:.2f} MHz")
+        system_info.append(f"Total Memory: {psutil.virtual_memory().total / (1024 * 1024 * 1024):.2f} GB")
+        system_info.append(f"Available Memory: {psutil.virtual_memory().available / (1024 * 1024 * 1024):.2f} GB")
+        system_info.append(f"Disk Partitions: {[partition.device for partition in psutil.disk_partitions()]}")
+
+    return '\n'.join(system_info)
+
+def log_system_info():
+    logging.info("System Information:")
+    logging.info(get_system_info())
+    logging.info("------------------------")
 
 def get_webpage_source(url):
     if requests:
@@ -99,7 +120,34 @@ def get_input_name(url, x, y):
 
 
 def get_window_info():
-    return 'Not available'
+    try:
+        from AppKit import NSWorkspace
+        from Quartz import (
+            CGWindowListCopyWindowInfo,
+            kCGWindowListOptionOnScreenOnly,
+            kCGNullWindowID
+        )
+
+        curr_app = NSWorkspace.sharedWorkspace().frontmostApplication()
+        curr_pid = NSWorkspace.sharedWorkspace().activeApplication()['NSApplicationProcessIdentifier']
+        curr_app_name = curr_app.localizedName()
+
+        options = kCGWindowListOptionOnScreenOnly
+        windowList = CGWindowListCopyWindowInfo(options, kCGNullWindowID)
+
+        for window in windowList:
+            pid = window['kCGWindowOwnerPID']
+            windowNumber = window['kCGWindowNumber']
+            ownerName = window['kCGWindowOwnerName']
+            geometry = window['kCGWindowBounds']
+            windowTitle = window.get('kCGWindowName', u'Unknown')
+            if curr_pid == pid:
+                return f"{windowTitle} - {ownerName} - {curr_app_name}"
+
+    except Exception as e:
+        print(f"Error: {str(e)}")
+
+    return "Not available"
 
 
 def take_screenshot(process_name):
@@ -229,6 +277,9 @@ def on_scroll(x, y, dx, dy):
 
 # Log machine information at the start of the script
 log_machine_info()
+
+# Log system information at the start of the script
+log_system_info()
 
 # Initialize global variables
 active_window = ''
