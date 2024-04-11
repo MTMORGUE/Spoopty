@@ -107,11 +107,10 @@ def take_screenshot(process_name):
     screenshot_dir = "Screen Captures"
     os.makedirs(screenshot_dir, exist_ok=True)
 
-    if mss:
-        with mss.mss() as sct:
-            for i, monitor in enumerate(sct.monitors[1:], start=1):
-                screenshot_name = f"{screenshot_dir}/{timestamp}_{process_name}_monitor{i}.png"
-                sct.shot(mon=monitor, output=screenshot_name)
+    with mss.mss() as sct:
+        for i, monitor in enumerate(sct.monitors[1:], start=1):
+            screenshot_name = f"{screenshot_dir}/{timestamp}_{process_name}_monitor{i}.png"
+            sct.shot(mon=i, output=screenshot_name)
 
 
 def is_social_media_url(url):
