@@ -42,7 +42,7 @@ This Python script provides a comprehensive solution for keylogging, mouse click
 3. Run the script using the following command:
 
    ```
-   python keylogger.py
+   python spoopty.py
    ```
 
    Make sure to replace `keylogger.py` with the actual name of the script file if it's different.
