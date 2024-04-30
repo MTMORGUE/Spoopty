@@ -45,7 +45,6 @@ This Python script provides a comprehensive solution for keylogging, mouse click
    python spoopty.py
    ```
 
-   Make sure to replace `keylogger.py` with the actual name of the script file if it's different.
 
 ## Configuration
 
